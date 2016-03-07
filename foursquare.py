@@ -8,7 +8,8 @@ if __name__ == "__main__":
     sc = SparkContext(appName="Foursquare")
 
     # Loading file
-    foursqr = sc.textFile('test.tsv', 1)
+    foursqr = sc.textFile('test.tsv')
+
 
     """
     Mapping tsv to list of tuples:
@@ -30,6 +31,6 @@ if __name__ == "__main__":
     column_2 = foursqr.map(lambda row: row[1])  # Choosing only from column #2, same as the user_id field
     only_uniq = column_2.distinct()             # Keep only the unique user_id's
     tally = only_uniq.count()                   # Count the amount of unique user_id's
-    print('Distinct user_ids', tally)           # WOOP WOOP
+    print('Distinct user_ids: ', tally - 1)     # WOOP WOOP (-1 because of the first row is headers)
 
     sc.stop()
