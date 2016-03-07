@@ -2,6 +2,7 @@
 /twitter_data
 /Foursquare_data.zip
 /twitter_data.zip
+.DS_Store
 /.idea
 # Byte-compiled / optimized / DLL files
 __pycache__/
