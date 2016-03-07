@@ -60,3 +60,13 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+Foursquare_data/dataset_TIST2015_Cities.txt
+
+Foursquare_data/dataset_TIST2015.tsv
+
+twitter_data/geotweets.tsv
+
+twitter_data/positive-words.txt
+
+twitter_data/negative-words.txt
