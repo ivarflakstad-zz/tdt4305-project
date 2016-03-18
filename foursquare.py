@@ -8,11 +8,41 @@ from datetime import datetime, timedelta
 from math import radians, cos, sin, asin, sqrt
 
 
-def haversine(lon1, lat1, lon2, lat2):
+def haversine_path(pos_seq):
+    _lon, _lat = None, None
+    path = 0
+    for lon, lat in pos_seq:
+        if _lon is None or _lat is None:
+            _lon, _lat = lon, lat
+            continue
+        path += haversine(_lon, _lat, lon, lat)
+    return path
+
+
+def haversine_path_dict(items):
+    print(items)
+    _lon, _lat = None, None
+    path = 0
+    for item in items:
+        lon, lat = item['pos']
+        if _lon is None or _lat is None:
+            _lon, _lat = lon, lat
+            continue
+        path += haversine(_lon, _lat, lon, lat)
+    return path
+
+
+def haversine(lon1, lat1, lon2, lat2, r=6371):
     """
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
+    :param lon1:
+    :param lat1:
+    :param lon2:
+    :param lat2:
+    :param r:
     """
+    # r = radius of earth in kilometers. Use 3956 for miles
     # convert decimal degrees to radians
     lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
 
@@ -21,7 +51,6 @@ def haversine(lon1, lat1, lon2, lat2):
     dlat = lat2 - lat1
     a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     c = 2 * asin(sqrt(a))
-    r = 6371  # Radius of earth in kilometers. Use 3956 for miles
     return c * r
 
 
@@ -110,10 +139,8 @@ if __name__ == "__main__":
 
     print('SQL Context created')
 
-
     print('Task 3')
     print('needs to be done')
-
 
     all_checkins = sqlContext.sql("SELECT * FROM checkins")
     wat = all_checkins.map(lambda l: "%i, %i, %s, %s, %s, %s, %s" % (l.checkin_id, l.user_id, l.session_id, l.time,
@@ -122,7 +149,8 @@ if __name__ == "__main__":
         print(all)
 
     all_cities = sqlContext.sql("SELECT * FROM cities")
-    wat = all_cities.map(lambda c: "%s, %s, %s, %s, %s" % (c.name, (c.lat, c.lon), c.country_code, c.country_name, c.type))
+    wat = all_cities.map(
+        lambda c: "%s, %s, %s, %s, %s" % (c.name, (c.lat, c.lon), c.country_code, c.country_name, c.type))
     for all in wat.collect():
         print(all)
 
@@ -134,12 +162,53 @@ if __name__ == "__main__":
     print('e) How many cities (distinct city names): ', tsv_unique_count(cities_file, 0))
 
     print('Task 5')
-    print('needs to be done')
+
+    checkins = sqlContext.sql("SELECT * from checkins")
+    wat = all_checkins.map(lambda l: "%i, %i, %s, %s, %s, %s, %s" % (l.checkin_id, l.user_id, l.session_id, l.time,
+                                                                     (l.lat, l.lon), l.category, l.subcategory))
+
+    for all in wat.collect():
+        print(all)
+
+    session_lengths = foursqr.map(lambda x: tuple(x.split('\t'))) \
+        .map(lambda row: row[2]) \
+        .countByValue()
+    '''
+    import matplotlib.pyplot as plt
+    x = range(len(test.keys()))
+    plt.bar(x, test.values(), 2, color='g')
+    plt.savefig("stuff.svg")
+    '''
+    print(session_lengths)
+    print('Need to create some sort of histogram')
 
     print('Task 6')
-    print('needs to be done')
+    test = foursqr.map(lambda l: tuple(l.split('\t')))\
+        .map(lambda row: (row[2], (float(row[5]), float(row[6]))))\
+        .groupByKey()\
+        .filter(lambda row: len(row[1]) >= 4)\
+        .map(lambda row: (row[0], haversine_path(list(row[1]))))
+
+    print(test.collect())
+
 
     print('Task 7')
+    '''
+    {'pos': (float(row[5]), float
+    '''
+    test = foursqr.map(lambda l: tuple(l.split('\t')))\
+        .map(lambda row: (row[2],
+                          {
+                              'pos': (float(row[5]), float(row[6])),
+                              'checkin_id': row[0],
+                              'timestamp': row[3]
+                          }))\
+        .groupByKey()\
+        .map(lambda row: (row[0], row[1], haversine_path_dict(list(row[1]))))\
+        .filter(lambda row: row[2] >= 50.0)\g
+        .takeOrdered(100, key=lambda row: -row[2])
+
+    print(test)
     print('needs to be done')
 
     print('Task 8')
