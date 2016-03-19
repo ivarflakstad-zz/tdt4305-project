@@ -20,7 +20,6 @@ def haversine_path(pos_seq):
 
 
 def haversine_path_dict(items):
-    print(items)
     _lon, _lat = None, None
     path = 0
     for item in items:
@@ -61,7 +60,7 @@ def timestamp(stamp, tz):
     return datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=sec) + timedelta(minutes=int(tz))
 
 
-def tsv_unique_count(sc_file, col_n=0, split_c='\t'):
+def unique_column_count(sc_file, col_n=0):
     """
     Count unique items in a Tabular Separated Values file by column.
     :param sc_file: SparkContext File, preferably TSV
@@ -69,42 +68,10 @@ def tsv_unique_count(sc_file, col_n=0, split_c='\t'):
     :param split_c: Character to split on, defaults to tab.
     :return:
     """
-
-    '''
-    Mapping tsv to list of tuples:
-
-    checkin_id	user_id	session_id	utc_time	timezone_offset	lat	lon	category	subcategory
-    25915736	1539	1539_AE_117	2013-02-06 17:46:30	-360	25.254118	55.30333	Food	Sushi Restaurant
-    22889371	1539	1539_AE_18	2012-11-11 12:29:30	-360	25.196387	55.280058	Outdoors & Recreation	Athletics & Sports
-
-    is mapped to ->
-
-    [(checkin_id, user_id, session_id, utc_time, timezone_offset, lat, lon, category, subcategory),
-    (25915736, 1539, 1539_AE_117, 2013-02-06 17:46:30, -360, 25.254118, 55.30333, Food, Sushi Restaurant),
-    (22889371, 1539, 1539_AE_18, 2012-11-11 12:29:30, -360, 25.196387, 55.280058, Outdoors & Recreation, Athletics & Sports)
-    ]
-    '''
-    foursqr = sc_file.map(lambda x: tuple(x.split(split_c)))
-
-    # Tallying for unique users.
-    column = foursqr.map(lambda row: row[col_n])  # Choosing only from column #2, same as the user_id field
-    only_uniq = column.distinct()  # Keep only the unique user_id's
-    tally = only_uniq.count()  # Count the amount of unique user_id's
-    return tally
-
-
-def csv_unique_count(sc_file, col_n=0):
-    """
-    Count unique items in a Comma Separated Values file by column.
-    :param sc_file: SparkContext File, preferably CSV
-    :param col_n: Column to count
-    :return:
-    """
-    tsv_unique_count(sc_file, col_n, split_c='\c')
+    return sc_file.map(lambda row: row[col_n]).distinct().count()
 
 
 if __name__ == "__main__":
-    # Setting context because Spark requires it
     sc = SparkContext(appName="Foursquare")
     sqlContext = SQLContext(sc)
 
@@ -113,12 +80,13 @@ if __name__ == "__main__":
     # Loading file
     foursqr = sc.textFile('test.tsv')
     header = foursqr.first()  # extract header
-    foursqr = foursqr.filter(lambda x: x != header)  # filter away header
+    foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
     print('foursquare loaded')
 
-    cities_file = sc.textFile('cities.txt')
+    cities_file = sc.textFile('cities.txt').map(lambda x: tuple(x.split('\t')))
     print('cities loaded')
 
+    '''
     print('Creating SQL Context')
     # Creating SQL context
     rows = foursqr.map(lambda l: l.split('\t'))
@@ -138,41 +106,21 @@ if __name__ == "__main__":
     schemaCities.registerTempTable("cities")
 
     print('SQL Context created')
+    '''
 
     print('Task 3')
+
     print('needs to be done')
 
-    all_checkins = sqlContext.sql("SELECT * FROM checkins")
-    wat = all_checkins.map(lambda l: "%i, %i, %s, %s, %s, %s, %s" % (l.checkin_id, l.user_id, l.session_id, l.time,
-                                                                     (l.lat, l.lon), l.category, l.subcategory))
-    for all in wat.collect():
-        print(all)
-
-    all_cities = sqlContext.sql("SELECT * FROM cities")
-    wat = all_cities.map(
-        lambda c: "%s, %s, %s, %s, %s" % (c.name, (c.lat, c.lon), c.country_code, c.country_name, c.type))
-    for all in wat.collect():
-        print(all)
-
     print('Task 4:')
-    print('a) Unique users (distinct user_ids): ', tsv_unique_count(foursqr, 1))
-    print('b) Total checkins (distinct checkin_ids): ', tsv_unique_count(foursqr, 0))
-    print('c) Total sessions (distinct session_ids): ', tsv_unique_count(foursqr, 2))
-    print('d) How many countries (distinct country_codes): ', tsv_unique_count(cities_file, 3))
-    print('e) How many cities (distinct city names): ', tsv_unique_count(cities_file, 0))
+    print('a) Unique users (distinct user_ids): ', unique_column_count(foursqr, 1))
+    print('b) Total checkins (distinct checkin_ids): ', unique_column_count(foursqr, 0))
+    print('c) Total sessions (distinct session_ids): ', unique_column_count(foursqr, 2))
+    print('d) How many countries (distinct country_codes): ', unique_column_count(cities_file, 3))
+    print('e) How many cities (distinct city names): ', unique_column_count(cities_file, 0))
 
     print('Task 5')
-
-    checkins = sqlContext.sql("SELECT * from checkins")
-    wat = all_checkins.map(lambda l: "%i, %i, %s, %s, %s, %s, %s" % (l.checkin_id, l.user_id, l.session_id, l.time,
-                                                                     (l.lat, l.lon), l.category, l.subcategory))
-
-    for all in wat.collect():
-        print(all)
-
-    session_lengths = foursqr.map(lambda x: tuple(x.split('\t'))) \
-        .map(lambda row: row[2]) \
-        .countByValue()
+    session_lengths = foursqr.map(lambda row: row[2]).countByValue()
     '''
     import matplotlib.pyplot as plt
     x = range(len(test.keys()))
@@ -183,32 +131,39 @@ if __name__ == "__main__":
     print('Need to create some sort of histogram')
 
     print('Task 6')
-    test = foursqr.map(lambda l: tuple(l.split('\t')))\
-        .map(lambda row: (row[2], (float(row[5]), float(row[6]))))\
-        .groupByKey()\
-        .filter(lambda row: len(row[1]) >= 4)\
-        .map(lambda row: (row[0], haversine_path(list(row[1]))))
+    test = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))})) \
+        .groupByKey() \
+        .filter(lambda row: len(row[1]) >= 4) \
+        .map(lambda row: (row[0], haversine_path_dict(list(row[1]))))
 
     print(test.collect())
 
-
     print('Task 7')
-    '''
-    {'pos': (float(row[5]), float
-    '''
-    test = foursqr.map(lambda l: tuple(l.split('\t')))\
-        .map(lambda row: (row[2],
-                          {
-                              'pos': (float(row[5]), float(row[6])),
-                              'checkin_id': row[0],
-                              'timestamp': row[3]
-                          }))\
-        .groupByKey()\
-        .map(lambda row: (row[0], row[1], haversine_path_dict(list(row[1]))))\
-        .filter(lambda row: row[2] >= 50.0)\g
+    test = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6])),
+                                             'checkin_id': row[0],
+                                             'user_id': row[1],
+                                             'timestamp': str(timestamp(row[3], row[4])),
+                                             'category': row[7],
+                                             'subcategory': row[8]}
+                                    )) \
+        .groupByKey() \
+        .map(lambda row: (row[0], row[1], haversine_path_dict(list(row[1])))) \
+        .filter(lambda row: row[2] >= 50.0) \
         .takeOrdered(100, key=lambda row: -row[2])
 
-    print(test)
+    with open("sessions.tsv", "w") as sessions_file:
+        sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
+        for session_id, session_store, length in test:
+            for session_map in session_store:
+                sessions_file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map['checkin_id'],
+                                                                          session_map['user_id'],
+                                                                          session_id,
+                                                                          session_map['timestamp'],
+                                                                          session_map['pos'][0],
+                                                                          session_map['pos'][1],
+                                                                          session_map['category'],
+                                                                          session_map['subcategory']))
+
     print('needs to be done')
 
     print('Task 8')
