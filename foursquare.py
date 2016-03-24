@@ -3,7 +3,10 @@ from operator import add
 
 from pyspark import SparkContext
 from pyspark.sql import SQLContext, Row
+import pyspark.sql.functions as pyspark_f
+from pyspark.sql.types import LongType, ArrayType
 
+import time
 from datetime import datetime, timedelta
 from math import radians, cos, sin, asin, sqrt
 
@@ -43,7 +46,7 @@ def haversine(lon1, lat1, lon2, lat2, r=6371):
     """
     # r = radius of earth in kilometers. Use 3956 for miles
     # convert decimal degrees to radians
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+    lon1, lat1, lon2, lat2 = map(radians, map(float, [lon1, lat1, lon2, lat2]))
 
     # haversine formula
     dlon = lon2 - lon1
@@ -65,95 +68,144 @@ def unique_column_count(sc_file, col_n=0):
     Count unique items in a Tabular Separated Values file by column.
     :param sc_file: SparkContext File, preferably TSV
     :param col_n: Column to count
-    :param split_c: Character to split on, defaults to tab.
     :return:
     """
     return sc_file.map(lambda row: row[col_n]).distinct().count()
 
 
-if __name__ == "__main__":
-    sc = SparkContext(appName="Foursquare")
-    sqlContext = SQLContext(sc)
+def multi_column_count(sc_file):
 
-    print('Foursquare!')
-    print('Task 1 - load the dataset')
-    # Loading file
-    foursqr = sc.textFile('test.tsv')
-    header = foursqr.first()  # extract header
-    foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
-    print('foursquare loaded')
+    return sc_file.map(lambda row: (row[0], row[1], row[2])).groupByKey()
 
-    cities_file = sc.textFile('cities.txt').map(lambda x: tuple(x.split('\t')))
-    print('cities loaded')
 
-    '''
-    print('Creating SQL Context')
-    # Creating SQL context
-    rows = foursqr.map(lambda l: l.split('\t'))
-    print('Task 2 - calculate local time for each checkin')  # see timestamp function
-    checkins = rows.map(lambda l: Row(checkin_id=int(l[0]), user_id=int(l[1]), session_id=l[2],
-                                      time=timestamp(l[3], l[4]), lat=float(l[5]), lon=float(l[6]), category=l[7],
-                                      subcategory=l[8]))
+def closest_city(lat, lon):
+    return 1
 
-    schemaCheckins = sqlContext.createDataFrame(checkins)
-    schemaCheckins.registerTempTable("checkins")
 
-    c_rows = cities_file.map(lambda l: l.split('\t'))
-    cities = c_rows.map(lambda c: Row(name=c[0], lat=float(c[1]), lon=float(c[2]), country_code=c[3],
-                                      country_name=c[4], type=c[5]))
-
-    schemaCities = sqlContext.createDataFrame(cities)
-    schemaCities.registerTempTable("cities")
-
-    print('SQL Context created')
-    '''
-
-    print('Task 3')
-
-    print('needs to be done')
-
-    print('Task 4:')
+def task_4(foursqr, cities):
+    a = time.time()
     print('a) Unique users (distinct user_ids): ', unique_column_count(foursqr, 1))
     print('b) Total checkins (distinct checkin_ids): ', unique_column_count(foursqr, 0))
     print('c) Total sessions (distinct session_ids): ', unique_column_count(foursqr, 2))
     print('d) How many countries (distinct country_codes): ', unique_column_count(cities_file, 3))
     print('e) How many cities (distinct city names): ', unique_column_count(cities_file, 0))
+    print('time:', time.time() - a)
 
-    print('Task 5')
+
+def task_5(foursqr):
+    a = time.time()
     session_lengths = foursqr.map(lambda row: row[2]).countByValue()
-    '''
-    import matplotlib.pyplot as plt
-    x = range(len(test.keys()))
-    plt.bar(x, test.values(), 2, color='g')
-    plt.savefig("stuff.svg")
-    '''
+    # sez = {y: x for x, y in session_lengths.items()}
     print(session_lengths)
-    print('Need to create some sort of histogram')
+    print('time 1:', time.time() - a)
+    # print(session_lengths)
 
-    print('Task 6')
-    test = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))})) \
+    '''
+    a = time.time()
+    sessionz = foursqr.map(lambda row: row[2]).groupBy(lambda x: x).mapValues(len).map(lambda x: (x[1], x[0]))\
+        .groupByKey().mapValues(len).collect()
+    print(sessionz)
+    print('time 2:', time.time() - a)
+    '''
+
+
+def task_6(foursqr):
+    a = time.time()
+    selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))})) \
         .groupByKey() \
         .filter(lambda row: len(row[1]) >= 4) \
-        .map(lambda row: (row[0], haversine_path_dict(list(row[1]))))
+        .map(lambda row: (row[0], haversine_path_dict(list(row[1]))))\
+        .collect()
+    print(selection)
+    print('time 1:', time.time() - a)
 
-    print(test.collect())
 
-    print('Task 7')
-    test = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6])),
-                                             'checkin_id': row[0],
-                                             'user_id': row[1],
-                                             'timestamp': str(timestamp(row[3], row[4])),
-                                             'category': row[7],
-                                             'subcategory': row[8]}
-                                    )) \
+def task_7(foursqr, df):
+    a = time.time()
+    selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6])),
+                                                  'checkin_id': row[0],
+                                                  'user_id': row[1],
+                                                  'timestamp': str(timestamp(row[3], row[4])),
+                                                  'category': row[7],
+                                                  'subcategory': row[8]}
+                                         ))\
+        .groupByKey() \
+        .map(lambda row: (row[0], row[1], haversine_path_dict(list(row[1])))) \
+        .filter(lambda row: row[2] >= 50.0) \
+        .takeOrdered(100, key=lambda row: -row[2])
+    print('time 1:', time.time() - a)
+    print('hurro')
+    print(selection)
+
+    for session_id, session_store, length in selection:
+        for session_map in session_store:
+            print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map['checkin_id'],
+                                                        session_map['user_id'],
+                                                        session_id,
+                                                        session_map['timestamp'],
+                                                        session_map['pos'][0],
+                                                        session_map['pos'][1],
+                                                        session_map['category'],
+                                                        session_map['subcategory']))
+
+    '''
+    Implemented a reduceByKey version that is 4x as fast, however - it is also wrong as haversine demands ordered positions.
+
+    a = time.time()
+
+    def jeez(x, y):
+        if x[1]:
+            x[2] += haversine(x[1][-1][4], x[1][-1][5], y[0][4], y[0][5])
+        else:
+            x[2] += haversine(x[0][4], x[0][5], y[0][4], y[0][5])
+        x[1] += [y[0]]
+        x[3] += 1
+        return x
+    #lambda x, y: x + y + (haversine(x[0][4], x[0][5], y[4], y[5]), )) \
+    selection = foursqr.map(lambda row: (row[2], [row[:2] + row[3:], [], 0, 0]))\
+        .reduceByKey(jeez) \
+        .filter(lambda row: row[1][-2] >= 50.0) \
+        .takeOrdered(100, key=lambda row: -row[1][-2])
+    print('time 2:', time.time() - a)
+    print('hurro')
+    print(selection)
+
+    def stuff(i):
+        return [i] if i else None
+
+    test = pyspark_f.UserDefinedFunction(lambda i: int(i) if i else None, LongType())
+
+    a = time.time()
+    selection = df.select('*').collect()
+    print('time 2:', time.time() - a)
+    print('hurro 2')
+    # print(selection)
+    map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6])),
+                                                  'checkin_id': row[0],
+                                                  'user_id': row[1],
+                                                  'timestamp': str(timestamp(row[3], row[4])),
+                                                  'category': row[7],
+                                                  'subcategory': row[8]}
+                                         ))\
         .groupByKey() \
         .map(lambda row: (row[0], row[1], haversine_path_dict(list(row[1])))) \
         .filter(lambda row: row[2] >= 50.0) \
         .takeOrdered(100, key=lambda row: -row[2])
 
+    for session_id, session_store, length in selection:
+        for session_map in session_store:
+            print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map['checkin_id'],
+                                                        session_map['user_id'],
+                                                        session_id,
+                                                        session_map['timestamp'],
+                                                        session_map['pos'][0],
+                                                        session_map['pos'][1],
+                                                        session_map['category'],
+                                                        session_map['subcategory']))
+
     with open("sessions.tsv", "w") as sessions_file:
         sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
-        for session_id, session_store, length in test:
+        for session_id, session_store, length in selection:
             for session_map in session_store:
                 sessions_file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map['checkin_id'],
                                                                           session_map['user_id'],
@@ -163,10 +215,64 @@ if __name__ == "__main__":
                                                                           session_map['pos'][1],
                                                                           session_map['category'],
                                                                           session_map['subcategory']))
+    '''
+
+if __name__ == "__main__":
+    sc = SparkContext(appName="Foursquare")
+    sqlContext = SQLContext(sc)
+
+    print('Foursquare!')
+    print('Task 1 - load the dataset')
+    # Loading file
+    # foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
+    foursqr = sc.textFile('test.tsv')
+    header = foursqr.first()  # extract header
+    foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
+    print('foursquare loaded')
+
+    cities_file = sc.textFile('cities.txt').map(lambda x: tuple(x.split('\t')))
+    print('cities loaded')
+    print('Creating SQL Context')
+    # Creating SQL context
+    cities = cities_file.map(lambda c: Row(name=c[0], lat=float(c[1]), lon=float(c[2]), country_code=c[3],
+                                           country_name=c[4], type=c[5]))
+
+    cities_df = sqlContext.createDataFrame(cities)
+    cities_df.registerTempTable('cities')
+    sqlContext.cacheTable('cities')
+
+    print('Task 2 - calculate local time for each checkin')  # see timestamp function
+    checkins = foursqr.map(lambda l: Row(checkin_id=int(l[0]), user_id=int(l[1]), session_id=l[2],
+                                         time=timestamp(l[3], l[4]), lat=float(l[5]), lon=float(l[6]), category=l[7],
+                                         subcategory=l[8], city=closest_city(float(l[5]), float(l[6])))
+                           )
+
+    checkin_df = sqlContext.createDataFrame(checkins)
+    checkin_df.registerTempTable("checkins")
+    print('SQL Context created')
+
+    print('Task 3')
+    print('needs to be done')
+
+    print('Task 4:')
+    # task_4(foursqr, cities_file)
+
+    print('Task 5')
+    # task_5(foursqr)
+
+    print('Need to create some sort of histogram')
+
+    print('Task 6')
+    # task__6(foursqr)
+
+    print('Task 7')
+    task_7(foursqr, checkin_df)
 
     print('needs to be done')
 
     print('Task 8')
     print('optional')
+
+
 
     sc.stop()
