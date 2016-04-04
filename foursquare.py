@@ -203,7 +203,7 @@ def task_7(foursqr, df):
                                                         session_map['category'],
                                                         session_map['subcategory']))
 
-    with open("sessions.tsv", "w") as sessions_file:
+    with open("foursquare_sessions_example.tsv", "w") as sessions_file:
         sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
         for session_id, session_store, length in selection:
             for session_map in session_store:
@@ -225,12 +225,12 @@ if __name__ == "__main__":
     print('Task 1 - load the dataset')
     # Loading file
     # foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
-    foursqr = sc.textFile('test.tsv')
+    foursqr = sc.textFile('foursquare_sessions_example.tsv')
     header = foursqr.first()  # extract header
     foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
     print('foursquare loaded')
 
-    cities_file = sc.textFile('cities.txt').map(lambda x: tuple(x.split('\t')))
+    cities_file = sc.textFile('foursquare_cities_example.txt').map(lambda x: tuple(x.split('\t')))
     print('cities loaded')
     print('Creating SQL Context')
     # Creating SQL context
