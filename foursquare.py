@@ -7,7 +7,6 @@ import pyspark.sql.functions as pyspark_f
 from pyspark.sql.types import LongType, ArrayType
 import matplotlib.pyplot as plt
 
-
 import time
 from datetime import datetime, timedelta
 from math import radians, cos, sin, asin, sqrt
@@ -92,12 +91,14 @@ def task_3(foursqr, cities):
     city_coordination_data = cities.map(lambda x: (x[0], x[1], x[2], x[4]))
 
     cart_user_city = user_coordination_data.cartesian(city_coordination_data).map(
-        lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)): (
-        checkin_id, city, country, haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
-        checkin_lat, checkin_lon)).filter(lambda (id, city, country, d, checkin_lat, checkin_lon): d < 1).collect()
+            lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)): (
+                checkin_id, city, country, haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
+                checkin_lat, checkin_lon)).filter(
+            lambda (id, city, country, d, checkin_lat, checkin_lon): d < 1).collect()
 
     for session_map in cart_user_city:
-        print("%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map[0], session_map[1], session_map[2], session_map[3], session_map[4], session_map[5]))
+        print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
+            session_map[0], session_map[1], session_map[2], session_map[3], session_map[4], session_map[5]))
 
 
 def task_4(foursqr, cities):
@@ -118,7 +119,7 @@ def task_5(foursqr):
 
 def task_6(foursqr):
     selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))})).groupByKey().filter(
-        lambda row: len(row[1]) >= 4).map(lambda row: (row[0], haversine_path_dict(list(row[1])))).collect()
+            lambda row: len(row[1]) >= 4).map(lambda row: (row[0], haversine_path_dict(list(row[1])))).collect()
 
     for session_map in selection:
         print("%s\t%s\n" % (session_map[0], session_map[1]))
@@ -148,7 +149,7 @@ def task_7(foursqr, df):
                                                         session_map['category'],
                                                         session_map['subcategory']))
 
-    with open("foursquare_sessions_example.tsv", "w") as sessions_file:
+    with open("foursquare_task7_output.tsv", "w") as sessions_file:
         sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
         for session_id, session_store, length in selection:
             for session_map in session_store:
@@ -160,8 +161,6 @@ def task_7(foursqr, df):
                                                                           session_map['pos'][1],
                                                                           session_map['category'],
                                                                           session_map['subcategory']))
-
-
 
     '''
     Implemented a reduceByKey version that is 4x as fast, however - it is also wrong as haversine demands ordered positions.
@@ -255,7 +254,6 @@ if __name__ == "__main__":
                                          subcategory=l[8], city=closest_city(float(l[5]), float(l[6])))
                            )
 
-
     print('Local time for each checkin calculated')
 
     print('Creating SQL Context for checkins')
@@ -274,9 +272,9 @@ if __name__ == "__main__":
     # TODO: create histogram
 
     print('Task 1.6 - Calculate distance in km for sessions with 4 check-ins or more')
-    #task_6(foursqr)
+    # task_6(foursqr)
 
     print('Task 1.7 - Find 100 longest sessions')
-    # task_7(foursqr, checkin_df)
+    task_7(foursqr, checkin_df)
 
     sc.stop()
