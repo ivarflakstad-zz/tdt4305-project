@@ -229,8 +229,8 @@ if __name__ == "__main__":
     print('Task 1 - Exploratory Analysis of Foursquare Dataset')
     print('Task 1.1 - Load the dataset')
 
-    foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
-    # foursqr = sc.textFile('foursquare_excerpt.tsv')
+    # foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
+    foursqr = sc.textFile('foursquare_excerpt.tsv')
     header = foursqr.first()  # extract header
     foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
     print('Foursquare loaded')
@@ -264,7 +264,7 @@ if __name__ == "__main__":
     print('SQL context for checkins created')
 
     print('Task 1.3 - Assign a city and country to each check-in')
-    # task_3(foursqr, cities_file)
+    task_3(foursqr, cities_file)
 
     print('Task 1.4 - Bunch of questions')
     # task_4(foursqr, cities_file)
