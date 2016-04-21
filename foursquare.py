@@ -90,15 +90,16 @@ def task_3(foursqr, cities):
     city_coordination_data = cities.map(lambda x: (x[0], x[1], x[2], x[4]))
 
     cart_user_city = user_coordination_data.cartesian(city_coordination_data)\
-        .map(lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)):
-                                  (checkin_id, city, country,
-                                   haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
-                                   checkin_lat, checkin_lon))\
-        .filter(lambda (id, city, country, d, checkin_lat, checkin_lon): d < 1).collect()
+          .map(lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)):
+             (checkin_id, (city, country,
+              haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
+              checkin_lat, checkin_lon)))\
+          .reduceByKey(lambda x1, x2: min(x1, x2, key=lambda x: x[1][2]))\
+          .collect()
 
     for session_map in cart_user_city:
         print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
-            session_map[0], session_map[1], session_map[2], session_map[3], session_map[4], session_map[5]))
+            session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
 
 
 def task_4(foursqr):
@@ -120,8 +121,7 @@ def task_5(foursqr):
 def task_6(foursqr):
     selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))}))\
         .groupByKey()\
-        .filter(
-        lambda row: len(row[1]) >= 4)\
+        .filter(lambda row: len(row[1]) >= 4)\
         .map(lambda row: (row[0], haversine_path_dict(list(row[1]))))\
         .collect()
 
@@ -270,17 +270,17 @@ if __name__ == "__main__":
     task_3(foursqr, cities_file)
 
     print('Task 1.4 - Bunch of questions')
-    task_4(foursqr)
+    #task_4(foursqr)
 
     print('Task 1.5 - Calculate lengths of sessions as number of check-ins and provide a histogram')
-    task_5(foursqr)
+    #task_5(foursqr)
     # TODO: create histogram
 
     print('Task 1.6 - Calculate distance in km for sessions with 4 check-ins or more')
-    task_6(foursqr)
+    #task_6(foursqr)
 
     print('Task 1.7 - Find 100 longest sessions')
-    task_7(foursqr)
+    #task_7(foursqr)
     # https://imp.cartodb.com/viz/803ad096-ed4a-11e5-a173-0e5db1731f59/public_map
 
     sc.stop()
