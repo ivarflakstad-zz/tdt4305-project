@@ -85,7 +85,6 @@ def closest_city(lat, lon):
 
 
 def task_3(foursqr, cities):
-    a = time.time()
     # checkin_id[0], lat[1], lon[2]
     user_coordination_data = foursqr.map(lambda x: (x[0], x[5], x[6]))
 
@@ -100,47 +99,29 @@ def task_3(foursqr, cities):
     for session_map in cart_user_city:
         print("%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map[0], session_map[1], session_map[2], session_map[3], session_map[4], session_map[5]))
 
-    print('Time:', time.time() - a)
-
 
 def task_4(foursqr, cities):
-    a = time.time()
     print('a) Unique users (distinct user_ids): ', unique_column_count(foursqr, 1))
     print('b) Total checkins (distinct checkin_ids): ', unique_column_count(foursqr, 0))
     print('c) Total sessions (distinct session_ids): ', unique_column_count(foursqr, 2))
     print('d) How many countries (distinct country_codes): ', unique_column_count(cities_file, 3))
     print('e) How many cities (distinct city names): ', unique_column_count(cities_file, 0))
-    print('Time:', time.time() - a)
 
 
 def task_5(foursqr):
-    a = time.time()
     session_lengths = foursqr.map(lambda row: row[2]).countByValue()
-
     # sez = {y: x for x, y in session_lengths.items()}
-    print('time 1:', time.time() - a)
 
     for key, value in session_lengths.items():
         print("%s\t%s\n" % (key, value))
 
-    '''
-    a = time.time()
-    sessionz = foursqr.map(lambda row: row[2]).groupBy(lambda x: x).mapValues(len).map(lambda x: (x[1], x[0]))\
-        .groupByKey().mapValues(len).collect()
-    print(sessionz)
-    print('time 2:', time.time() - a)
-    '''
-
 
 def task_6(foursqr):
-    a = time.time()
     selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))})).groupByKey().filter(
         lambda row: len(row[1]) >= 4).map(lambda row: (row[0], haversine_path_dict(list(row[1])))).collect()
 
     for session_map in selection:
         print("%s\t%s\n" % (session_map[0], session_map[1]))
-
-    print('Time:', time.time() - a)
 
 
 def task_7(foursqr, df):
@@ -166,10 +147,6 @@ def task_7(foursqr, df):
                                                         session_map['pos'][1],
                                                         session_map['category'],
                                                         session_map['subcategory']))
-
-    print('Time:', time.time() - a)
-
-    # TODO : output to .tsv/.csv file and visualize in CartoDB
 
     with open("foursquare_sessions_example.tsv", "w") as sessions_file:
         sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
@@ -287,13 +264,13 @@ if __name__ == "__main__":
     print('SQL context for checkins created')
 
     print('Task 1.3 - Assign a city and country to each check-in')
-    #task_3(foursqr, cities_file)
+    # task_3(foursqr, cities_file)
 
     print('Task 1.4 - Bunch of questions')
     # task_4(foursqr, cities_file)
 
     print('Task 1.5 - Calculate lengths of sessions as number of check-ins and provide a histogram')
-    task_5(foursqr)
+    # task_5(foursqr)
     # TODO: create histogram
 
     print('Task 1.6 - Calculate distance in km for sessions with 4 check-ins or more')
