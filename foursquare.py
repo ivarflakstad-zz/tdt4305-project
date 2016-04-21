@@ -5,6 +5,8 @@ from pyspark import SparkContext
 from pyspark.sql import SQLContext, Row
 import pyspark.sql.functions as pyspark_f
 from pyspark.sql.types import LongType, ArrayType
+import matplotlib.pyplot as plt
+
 
 import time
 from datetime import datetime, timedelta
@@ -60,6 +62,7 @@ def timestamp(stamp, tz):
     date, time = stamp.split(' ')
     year, month, day = map(int, date.split('-'))
     hour, minute, sec = map(int, time.split(':'))
+    print(tz)
     return datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=sec) + timedelta(minutes=int(tz))
 
 
@@ -110,9 +113,9 @@ def task_5(foursqr):
     a = time.time()
     session_lengths = foursqr.map(lambda row: row[2]).countByValue()
     # sez = {y: x for x, y in session_lengths.items()}
-    print(session_lengths)
+    #print(session_lengths)
     print('time 1:', time.time() - a)
-    # print(session_lengths)
+
 
     '''
     a = time.time()
@@ -145,7 +148,7 @@ def task_7(foursqr, df):
         .filter(lambda row: row[2] >= 50.0) \
         .takeOrdered(100, key=lambda row: -row[2])
     print('time 1:', time.time() - a)
-    print('hurro')
+
     print(selection)
 
     for session_id, session_store, length in selection:
@@ -161,8 +164,24 @@ def task_7(foursqr, df):
 
     # TODO : output to .tsv/.csv file and visualize in CartoDB
 
+    with open("foursquare_sessions_example.tsv", "w") as sessions_file:
+        sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
+        for session_id, session_store, length in selection:
+            for session_map in session_store:
+                sessions_file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map['checkin_id'],
+                                                                          session_map['user_id'],
+                                                                          session_id,
+                                                                          session_map['timestamp'],
+                                                                          session_map['pos'][0],
+                                                                          session_map['pos'][1],
+                                                                          session_map['category'],
+                                                                          session_map['subcategory']))
+
+
+
     '''
     Implemented a reduceByKey version that is 4x as fast, however - it is also wrong as haversine demands ordered positions.
+
 
     a = time.time()
 
@@ -216,18 +235,6 @@ def task_7(foursqr, df):
                                                         session_map['category'],
                                                         session_map['subcategory']))
 
-    with open("foursquare_sessions_example.tsv", "w") as sessions_file:
-        sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
-        for session_id, session_store, length in selection:
-            for session_map in session_store:
-                sessions_file.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map['checkin_id'],
-                                                                          session_map['user_id'],
-                                                                          session_id,
-                                                                          session_map['timestamp'],
-                                                                          session_map['pos'][0],
-                                                                          session_map['pos'][1],
-                                                                          session_map['category'],
-                                                                          session_map['subcategory']))
     '''
 
 
@@ -238,13 +245,13 @@ if __name__ == "__main__":
     print('Task 1 - Exploratory Analysis of Foursquare Dataset')
     print('Task 1.1 - load the dataset')
 
-    # foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
-    foursqr = sc.textFile('foursquare_sessions_example.tsv')
+    foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
+    # foursqr = sc.textFile('foursquare_excerpt.tsv')
     header = foursqr.first()  # extract header
     foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
     print('Foursquare loaded')
 
-    cities_file = sc.textFile('foursquare_cities_example.txt').map(lambda x: tuple(x.split('\t')))
+    cities_file = sc.textFile('Foursquare_data/dataset_TIST2015_Cities.txt').map(lambda x: tuple(x.split('\t')))
     print('Cities loaded')
 
     print('Creating SQL Context')
@@ -275,7 +282,7 @@ if __name__ == "__main__":
     # task_4(foursqr, cities_file)
 
     print('Task 1.5 - Calculate lengths of sessions as number of check-ins and provide a histogram')
-    # task_5(foursqr)
+    task_5(foursqr)
     # TODO: create histogram
 
     print('Task 1.6 - Calculate distance in km for sessions with 4 check-ins or more')

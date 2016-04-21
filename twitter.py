@@ -12,8 +12,20 @@ def get_weekday(timestamp, offset):
     return weekdays[weekday]
 
 
+def tweet_char_filter(tweet):
+    tweet_list = []
+    tweet_part = ''
+    for char in tweet.lower():
+        order = ord(char)
+        if 64 < order < 91 or 96 < order < 123 or c == 32 or c == 45:
+            tweet_part += char
+        else:
+            tweet_list.append(tweet_part)
+            tweet_part = ''
+    return tweet_list
+
 def get_tweet_polarity(tweet, negative_words, positive_words):
-    word_list = tweet.translate(None, ",!.;#?:@-").lower().split(' ')
+    word_list = tweet_char_filter(tweet)
     num_positive = len([i for i in word_list if i in positive_words])
     num_negative = len([i for i in word_list if i in negative_words])
 
