@@ -55,12 +55,10 @@ if __name__ == "__main__":
 
     # positive_words_data = sc.textFile(pos_path).collect()
     positive_words_data = sc.textFile("hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/positive-words.txt").collect()
-    positive_words_data = set(positive_words_data)
     print('Positive words loaded')
 
     # negative_words_data = sc.textFile(neg_path).collect()
     negative_words_data = sc.textFile("hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/negative-words.txt").collect()
-    negative_words_data = set(negative_words_data)
     print('Negative words loaded')
 
     print('Task 2.2 - Find aggregated polarity of all english tweets for each city in the US for each day of week')
@@ -78,7 +76,8 @@ if __name__ == "__main__":
 
     # TODO : combine by key and sum polarity
 
-    tweets.foreach(print)
+    for session_map in tweets.collect():
+        print("%s\t%s\t%s\n" % (session_map[0], session_map[1], session_map[2]))
 
     print('Task 2.3 - Output result into file')
     # 'city<tab>day_of_week<tab>overall_polarity'

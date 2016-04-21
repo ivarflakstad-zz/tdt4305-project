@@ -85,6 +85,7 @@ def closest_city(lat, lon):
 
 
 def task_3(foursqr, cities):
+    a = time.time()
     # checkin_id[0], lat[1], lon[2]
     user_coordination_data = foursqr.map(lambda x: (x[0], x[5], x[6]))
 
@@ -94,9 +95,12 @@ def task_3(foursqr, cities):
     cart_user_city = user_coordination_data.cartesian(city_coordination_data).map(
         lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)): (
         checkin_id, city, country, haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
-        checkin_lat, checkin_lon)).filter(lambda (id, city, country, d, checkin_lat, checkin_lon): d < 1)
+        checkin_lat, checkin_lon)).filter(lambda (id, city, country, d, checkin_lat, checkin_lon): d < 1).collect()
 
-    print(cart_user_city.collect())
+    for session_map in cart_user_city:
+        print("%s\t%s\t%s\t%s\t%s\t%s\n" % (session_map[0], session_map[1], session_map[2], session_map[3], session_map[4], session_map[5]))
+
+    print('Time:', time.time() - a)
 
 
 def task_4(foursqr, cities):
@@ -106,16 +110,18 @@ def task_4(foursqr, cities):
     print('c) Total sessions (distinct session_ids): ', unique_column_count(foursqr, 2))
     print('d) How many countries (distinct country_codes): ', unique_column_count(cities_file, 3))
     print('e) How many cities (distinct city names): ', unique_column_count(cities_file, 0))
-    print('time:', time.time() - a)
+    print('Time:', time.time() - a)
 
 
 def task_5(foursqr):
     a = time.time()
     session_lengths = foursqr.map(lambda row: row[2]).countByValue()
+
     # sez = {y: x for x, y in session_lengths.items()}
-    #print(session_lengths)
     print('time 1:', time.time() - a)
 
+    for key, value in session_lengths.items():
+        print("%s\t%s\n" % (key, value))
 
     '''
     a = time.time()
@@ -130,12 +136,14 @@ def task_6(foursqr):
     a = time.time()
     selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))})).groupByKey().filter(
         lambda row: len(row[1]) >= 4).map(lambda row: (row[0], haversine_path_dict(list(row[1])))).collect()
-    print(selection)
-    print('time 1:', time.time() - a)
+
+    for session_map in selection:
+        print("%s\t%s\n" % (session_map[0], session_map[1]))
+
+    print('Time:', time.time() - a)
 
 
 def task_7(foursqr, df):
-    a = time.time()
     selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6])),
                                                   'checkin_id': row[0],
                                                   'user_id': row[1],
@@ -147,9 +155,6 @@ def task_7(foursqr, df):
         .map(lambda row: (row[0], row[1], haversine_path_dict(list(row[1])))) \
         .filter(lambda row: row[2] >= 50.0) \
         .takeOrdered(100, key=lambda row: -row[2])
-    print('time 1:', time.time() - a)
-
-    print(selection)
 
     for session_id, session_store, length in selection:
         for session_map in session_store:
@@ -161,6 +166,8 @@ def task_7(foursqr, df):
                                                         session_map['pos'][1],
                                                         session_map['category'],
                                                         session_map['subcategory']))
+
+    print('Time:', time.time() - a)
 
     # TODO : output to .tsv/.csv file and visualize in CartoDB
 
@@ -243,7 +250,7 @@ if __name__ == "__main__":
     sqlContext = SQLContext(sc)
 
     print('Task 1 - Exploratory Analysis of Foursquare Dataset')
-    print('Task 1.1 - load the dataset')
+    print('Task 1.1 - Load the dataset')
 
     foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
     # foursqr = sc.textFile('foursquare_excerpt.tsv')
@@ -254,14 +261,14 @@ if __name__ == "__main__":
     cities_file = sc.textFile('Foursquare_data/dataset_TIST2015_Cities.txt').map(lambda x: tuple(x.split('\t')))
     print('Cities loaded')
 
-    print('Creating SQL Context')
-    # Creating SQL context
+    print('Creating SQL Context for cities')
     cities = cities_file.map(lambda c: Row(name=c[0], lat=float(c[1]), lon=float(c[2]), country_code=c[3],
                                            country_name=c[4], type=c[5]))
 
     cities_df = sqlContext.createDataFrame(cities)
     cities_df.registerTempTable('cities')
     sqlContext.cacheTable('cities')
+    print('SQL context for cities created')
 
     # TODO : define as function
     # See timestamp function
@@ -271,14 +278,18 @@ if __name__ == "__main__":
                                          subcategory=l[8], city=closest_city(float(l[5]), float(l[6])))
                            )
 
+
+    print('Local time for each checkin calculated')
+
+    print('Creating SQL Context for checkins')
     checkin_df = sqlContext.createDataFrame(checkins)
     checkin_df.registerTempTable("checkins")
-    print('SQL Context created')
+    print('SQL context for checkins created')
 
     print('Task 1.3 - Assign a city and country to each check-in')
-    # task_3(foursqr, cities_file)
+    #task_3(foursqr, cities_file)
 
-    print('Task 1.4 - bunch of questions')
+    print('Task 1.4 - Bunch of questions')
     # task_4(foursqr, cities_file)
 
     print('Task 1.5 - Calculate lengths of sessions as number of check-ins and provide a histogram')
@@ -286,7 +297,7 @@ if __name__ == "__main__":
     # TODO: create histogram
 
     print('Task 1.6 - Calculate distance in km for sessions with 4 check-ins or more')
-    # task__6(foursqr)
+    #task_6(foursqr)
 
     print('Task 1.7 - Find 100 longest sessions')
     # task_7(foursqr, checkin_df)
