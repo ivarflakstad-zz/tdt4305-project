@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # Loading files
 
     # twitter_data = sc.textFile(input_path).map(lambda x: tuple(x.split('\t')))
-    twitter_data = sc.textFile('twitter_tweets_example.tsv').map(lambda x: tuple(x.split('\t')))
+    twitter_data = sc.textFile('tweets_excerpt.tsv').map(lambda x: tuple(x.split('\t')))
     print('Tweets loaded')
 
     # positive_words_data = sc.textFile(pos_path).collect()
