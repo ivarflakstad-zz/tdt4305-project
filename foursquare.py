@@ -6,10 +6,11 @@ from pyspark.sql import SQLContext, Row
 import pyspark.sql.functions as pyspark_f
 from pyspark.sql.types import LongType, ArrayType
 import matplotlib.pyplot as plt
+import math
 
 import time
 from datetime import datetime, timedelta
-from math import radians, cos, sin, asin, sqrt
+from math import radians, cos, sin, asin, atan2, sqrt
 
 
 def haversine_path(pos_seq):
@@ -70,6 +71,7 @@ def unique_column_count(sc_file, col_n=0):
     :param sc_file: SparkContext File, preferably TSV
     :param col_n: Column to count
     :return:
+
     """
     return sc_file.map(lambda row: row[col_n]).distinct().count()
 
@@ -119,7 +121,8 @@ def task_5(foursqr):
 
 
 def task_6(foursqr):
-    selection = foursqr.map(lambda row: (row[2], {'pos': (float(row[5]), float(row[6]))}))\
+    selection = foursqr.map(lambda row: (row[2],
+                                         {'pos': (float(row[5]), float(row[6]))}))\
         .groupByKey()\
         .filter(lambda row: len(row[1]) >= 4)\
         .map(lambda row: (row[0], haversine_path_dict(list(row[1]))))\
@@ -225,6 +228,88 @@ def task_7(foursqr):
     '''
 
 
+import kdtree
+from scipy.spatial import cKDTree
+
+def cartesian_to_latlong(x, y, z, r=6371):
+    lat = asin(z / r)
+    lon = atan2(y, x)
+    return lat, lon
+
+def cartesian_haversine(node, point):
+    x, y, z = node
+    x1, y1, z1 = point
+    lat, lon = cartesian_to_latlong(x, y, z)
+    lat1, lon1 = cartesian_to_latlong(x1, y1, z1)
+    return haversine(lat1, lon, lat1, lon1)
+
+
+def latlong_to_cartesian(lat, lon, r=6371):
+    x = r*cos(lon)*sin(lat)
+    y = r*sin(lon)*sin(lat)
+    #z = r*cos(lat)
+    return x, y
+
+def kdtree_query(tree, lat, lon):
+    coords = latlong_to_cartesian(float(lat), float(lon))
+    result = tuple(tree.search_nn(coords))[0].data
+    return result
+
+def ckdtree_query(tree, lat, lon):
+    return tree.query(latlong_to_cartesian(float(lat), float(lon)), k=1, eps=0, p=2, distance_upper_bound=6371.0)
+
+def test(foursqr, cities):
+    # checkin_id[0], lat[1], lon[2]
+    user_coordination_data = foursqr.map(lambda x: (x[0], float(x[5]), float(x[6])))
+
+    # city[0], lat[1], lon[2], country[3]
+    city_coordination_data = cities.map(lambda x: (x[0], x[1], x[2], x[4]))
+    cartesian_coords_cities_dict = dict(city_coordination_data
+                                        .map(lambda row: (tuple(latlong_to_cartesian(float(row[1]), float(row[2]))), (row[0], row[3])))
+                                        .collect())
+
+    tree = kdtree.create(cartesian_coords_cities_dict.keys())
+
+    a = time.time()
+    cart_user_city_2 = user_coordination_data.map(lambda row:
+                                   (cartesian_coords_cities_dict[kdtree_query(tree, float(row[1]), float(row[2]))]
+                                    , row)
+                                   ).collect()
+
+    print("KDTree: ", time.time() - a)
+    '''
+    a = time.time()
+    print(list(map(list, cartesian_coords_cities_dict.keys())))
+    ckdtree = cKDTree(data=list(map(list, cartesian_coords_cities_dict.keys())))
+    cart_user_city_3 = user_coordination_data.map(lambda row:
+                                   (cartesian_coords_cities_dict[ckdtree_query(ckdtree, float(row[1]), float(row[2]))]
+                                    , row)
+                                   ).collect()
+    print("TIME 2: ", time.time() - a)
+    '''
+    a = time.time()
+    cart_user_city = user_coordination_data.cartesian(city_coordination_data)\
+          .map(lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)):
+             (checkin_id, (city, country,
+              haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
+              checkin_lat, checkin_lon)))\
+          .reduceByKey(lambda x1, x2: min(x1, x2, key=lambda x: x[1][2]))\
+          .collect()
+
+    print("reduceByKey: ", time.time() - a)
+
+    for session_map in cart_user_city_2:
+        print('KDTree', session_map)
+        #print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
+        #    session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
+
+    '''
+    for session_map in cart_user_city:
+        print('reduceByKey', session_map)
+        #print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
+        #    session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
+    '''
+
 if __name__ == "__main__":
     sc = SparkContext(appName="Foursquare")
     sqlContext = SQLContext(sc)
@@ -234,6 +319,8 @@ if __name__ == "__main__":
 
     # foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
     foursqr = sc.textFile('foursquare_excerpt.tsv')
+    # foursqr = sc.textFile('foursquare_excerpt2.tsv')
+    # foursqr = sc.textFile('foursquare_excerpt3.tsv')
     header = foursqr.first()  # extract header
     foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
     print('Foursquare loaded')
@@ -267,7 +354,7 @@ if __name__ == "__main__":
     print('SQL context for checkins created')
 
     print('Task 1.3 - Assign a city and country to each check-in')
-    task_3(foursqr, cities_file)
+    # task_3(foursqr, cities_file)
 
     print('Task 1.4 - Bunch of questions')
     #task_4(foursqr)
@@ -282,5 +369,9 @@ if __name__ == "__main__":
     print('Task 1.7 - Find 100 longest sessions')
     #task_7(foursqr)
     # https://imp.cartodb.com/viz/803ad096-ed4a-11e5-a173-0e5db1731f59/public_map
+
+
+    test(foursqr, cities_file)
+
 
     sc.stop()
