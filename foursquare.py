@@ -229,7 +229,6 @@ def task_7(foursqr):
 
 
 import kdtree
-from scipy.spatial import cKDTree
 
 def cartesian_to_latlong(x, y, z, r=6371):
     lat = asin(z / r)
@@ -245,18 +244,18 @@ def cartesian_haversine(node, point):
 
 
 def latlong_to_cartesian(lat, lon, r=6371):
+    lat = radians(lat)
+    lon = radians(lon)
+
     x = r*cos(lon)*sin(lat)
     y = r*sin(lon)*sin(lat)
-    #z = r*cos(lat)
-    return x, y
+    z = r*cos(lat)
+    return x, y, z
 
 def kdtree_query(tree, lat, lon):
     coords = latlong_to_cartesian(float(lat), float(lon))
     result = tuple(tree.search_nn(coords))[0].data
     return result
-
-def ckdtree_query(tree, lat, lon):
-    return tree.query(latlong_to_cartesian(float(lat), float(lon)), k=1, eps=0, p=2, distance_upper_bound=6371.0)
 
 def test(foursqr, cities):
     # checkin_id[0], lat[1], lon[2]
@@ -264,31 +263,21 @@ def test(foursqr, cities):
 
     # city[0], lat[1], lon[2], country[3]
     city_coordination_data = cities.map(lambda x: (x[0], x[1], x[2], x[4]))
+    a = time.time()
     cartesian_coords_cities_dict = dict(city_coordination_data
                                         .map(lambda row: (tuple(latlong_to_cartesian(float(row[1]), float(row[2]))), (row[0], row[3])))
                                         .collect())
 
     tree = kdtree.create(cartesian_coords_cities_dict.keys())
-
-    a = time.time()
-    cart_user_city_2 = user_coordination_data.map(lambda row:
+    cart_user_city_1 = user_coordination_data.map(lambda row:
                                    (cartesian_coords_cities_dict[kdtree_query(tree, float(row[1]), float(row[2]))]
                                     , row)
                                    ).collect()
 
     print("KDTree: ", time.time() - a)
-    '''
+
     a = time.time()
-    print(list(map(list, cartesian_coords_cities_dict.keys())))
-    ckdtree = cKDTree(data=list(map(list, cartesian_coords_cities_dict.keys())))
-    cart_user_city_3 = user_coordination_data.map(lambda row:
-                                   (cartesian_coords_cities_dict[ckdtree_query(ckdtree, float(row[1]), float(row[2]))]
-                                    , row)
-                                   ).collect()
-    print("TIME 2: ", time.time() - a)
-    '''
-    a = time.time()
-    cart_user_city = user_coordination_data.cartesian(city_coordination_data)\
+    cart_user_city_3 = user_coordination_data.cartesian(city_coordination_data)\
           .map(lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)):
              (checkin_id, (city, country,
               haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
@@ -297,14 +286,13 @@ def test(foursqr, cities):
           .collect()
 
     print("reduceByKey: ", time.time() - a)
-
-    for session_map in cart_user_city_2:
+    '''
+    for session_map in cart_user_city_1:
         print('KDTree', session_map)
         #print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
         #    session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
 
-    '''
-    for session_map in cart_user_city:
+    for session_map in cart_user_city_3:
         print('reduceByKey', session_map)
         #print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
         #    session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
@@ -318,11 +306,12 @@ if __name__ == "__main__":
     print('Task 1.1 - Load the dataset')
 
     # foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
-    foursqr = sc.textFile('foursquare_excerpt.tsv')
-    # foursqr = sc.textFile('foursquare_excerpt2.tsv')
+    # foursqr = sc.textFile('foursquare_excerpt.tsv')
+    foursqr = sc.textFile('foursquare_excerpt2.tsv')
     # foursqr = sc.textFile('foursquare_excerpt3.tsv')
+    # foursqr = sc.textFile('foursquare_excerpt4.tsv')
     header = foursqr.first()  # extract header
-    foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
+    foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t'))).repartition(6)
     print('Foursquare loaded')
 
     cities_file = sc.textFile('Foursquare_data/dataset_TIST2015_Cities.txt').map(lambda x: tuple(x.split('\t')))
@@ -357,7 +346,7 @@ if __name__ == "__main__":
     # task_3(foursqr, cities_file)
 
     print('Task 1.4 - Bunch of questions')
-    #task_4(foursqr)
+    task_4(foursqr)
 
     print('Task 1.5 - Calculate lengths of sessions as number of check-ins and provide a histogram')
     #task_5(foursqr)
