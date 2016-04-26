@@ -10,7 +10,7 @@ import math
 
 import time
 from datetime import datetime, timedelta
-from math import radians, cos, sin, asin, atan2, sqrt
+from math import radians, cos, sin, asin, atan2, sqrt, degrees
 
 
 def haversine_path(pos_seq):
@@ -113,12 +113,12 @@ def task_4(foursqr):
 
 
 def task_5(foursqr):
-    session_lengths = foursqr.map(lambda row: row[2]).countByValue()
+    session_lengths = foursqr.map(lambda row: (row[2], 1))\
+                        .reduceByKey(lambda x, y: x+y)\
+                        .map(lambda row: (row[1], ))\
+                        .countByKey()
     # sez = {y: x for x, y in session_lengths.items()}
-
-    for key, value in session_lengths.items():
-        print("%s\t%s\n" % (key, value))
-
+    print(session_lengths)
 
 def task_6(foursqr):
     selection = foursqr.map(lambda row: (row[2],
@@ -229,11 +229,12 @@ def task_7(foursqr):
 
 
 import kdtree
+from rtree import Rtree
 
-def cartesian_to_latlong(x, y, z, r=6371):
+def cartesian_to_latlong(x, y, z, r=6371.0):
     lat = asin(z / r)
     lon = atan2(y, x)
-    return lat, lon
+    return degrees(lat), degrees(lon)
 
 def cartesian_haversine(node, point):
     x, y, z = node
@@ -257,6 +258,11 @@ def kdtree_query(tree, lat, lon):
     result = tuple(tree.search_nn(coords))[0].data
     return result
 
+def rtree_query(index, lat, lon):
+    return index.nearest(latlong_to_cartesian(lat, lon))
+
+
+
 def test(foursqr, cities):
     # checkin_id[0], lat[1], lon[2]
     user_coordination_data = foursqr.map(lambda x: (x[0], float(x[5]), float(x[6])))
@@ -270,12 +276,32 @@ def test(foursqr, cities):
 
     tree = kdtree.create(cartesian_coords_cities_dict.keys())
     cart_user_city_1 = user_coordination_data.map(lambda row:
-                                   (cartesian_coords_cities_dict[kdtree_query(tree, float(row[1]), float(row[2]))]
-                                    , row)
-                                   ).collect()
+                                                  (
+                                                      cartesian_coords_cities_dict[
+                                                          kdtree_query(tree, float(row[1]), float(row[2]))
+                                                      ]
+                                                      , row
+                                                  )
+                                                  ).collect()
 
     print("KDTree: ", time.time() - a)
 
+    a = time.time()
+    r_tree = Rtree()
+    for key, value in cartesian_coords_cities_dict.items():
+        r_tree.add(key, value)
+
+
+    cart_user_city_2 = user_coordination_data.map(lambda row:
+                                                  (
+                                                      cartesian_coords_cities_dict[
+                                                          rtree_query(r_tree, float(row[1]), float(row[2]))
+                                                      ]
+                                                      , row
+                                                  )
+                                                  ).collect()
+    print("R-Tree: ", time.time() - a)
+    '''
     a = time.time()
     cart_user_city_3 = user_coordination_data.cartesian(city_coordination_data)\
           .map(lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)):
@@ -286,7 +312,6 @@ def test(foursqr, cities):
           .collect()
 
     print("reduceByKey: ", time.time() - a)
-    '''
     for session_map in cart_user_city_1:
         print('KDTree', session_map)
         #print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
@@ -305,9 +330,9 @@ if __name__ == "__main__":
     print('Task 1 - Exploratory Analysis of Foursquare Dataset')
     print('Task 1.1 - Load the dataset')
 
-    # foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
+    foursqr = sc.textFile('Foursquare_data/dataset_TIST2015.tsv')
     # foursqr = sc.textFile('foursquare_excerpt.tsv')
-    foursqr = sc.textFile('foursquare_excerpt2.tsv')
+    # foursqr = sc.textFile('foursquare_excerpt2.tsv')
     # foursqr = sc.textFile('foursquare_excerpt3.tsv')
     # foursqr = sc.textFile('foursquare_excerpt4.tsv')
     header = foursqr.first()  # extract header
@@ -343,13 +368,13 @@ if __name__ == "__main__":
     print('SQL context for checkins created')
 
     print('Task 1.3 - Assign a city and country to each check-in')
-    # task_3(foursqr, cities_file)
+    # cities = task_3(foursqr, cities_file)
 
     print('Task 1.4 - Bunch of questions')
-    task_4(foursqr)
+    # task_4(cities)
 
     print('Task 1.5 - Calculate lengths of sessions as number of check-ins and provide a histogram')
-    #task_5(foursqr)
+    task_5(foursqr)
     # TODO: create histogram
 
     print('Task 1.6 - Calculate distance in km for sessions with 4 check-ins or more')
@@ -360,7 +385,7 @@ if __name__ == "__main__":
     # https://imp.cartodb.com/viz/803ad096-ed4a-11e5-a173-0e5db1731f59/public_map
 
 
-    test(foursqr, cities_file)
+    #test(foursqr, cities_file)
 
 
     sc.stop()
