@@ -10,7 +10,7 @@ import math
 
 import time
 from datetime import datetime, timedelta
-from math import radians, cos, sin, asin, atan2, sqrt, degrees
+from math import radians, cos, sin, asin, atan2, sqrt, degrees, log
 
 
 def haversine_path(pos_seq):
@@ -113,12 +113,18 @@ def task_4(foursqr):
 
 
 def task_5(foursqr):
+    a = time.time()
     session_lengths = foursqr.map(lambda row: (row[2], 1))\
                         .reduceByKey(lambda x, y: x+y)\
                         .map(lambda row: (row[1], ))\
                         .countByKey()
     # sez = {y: x for x, y in session_lengths.items()}
+    print('Task 5 time: ', time.time() - a)
     print(session_lengths)
+    plt.bar(session_lengths.keys(), list(map(log, session_lengths.values())))
+    plt.xlabel('Session length')
+    plt.ylabel('Sessions of given length (in log)')
+    plt.show()
 
 def task_6(foursqr):
     selection = foursqr.map(lambda row: (row[2],
@@ -336,8 +342,9 @@ if __name__ == "__main__":
     # foursqr = sc.textFile('foursquare_excerpt3.tsv')
     # foursqr = sc.textFile('foursquare_excerpt4.tsv')
     header = foursqr.first()  # extract header
-    foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t'))).repartition(6)
-    print('Foursquare loaded')
+    foursqr = foursqr.filter(lambda x: x != header).map(lambda x: tuple(x.split('\t')))
+
+    print('Foursquare loaded, amount of partions: %s' % (foursqr.getNumPartitions(),))
 
     cities_file = sc.textFile('Foursquare_data/dataset_TIST2015_Cities.txt').map(lambda x: tuple(x.split('\t')))
     print('Cities loaded')
