@@ -84,6 +84,8 @@ def closest_city(lat, lon):
     return 1
 
 
+'''
+
 def task_3(foursqr, cities):
     # checkin_id[0], lat[1], lon[2]
     user_coordination_data = foursqr.map(lambda x: (x[0], x[5], x[6]))
@@ -102,14 +104,20 @@ def task_3(foursqr, cities):
     for session_map in cart_user_city:
         print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
             session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
+'''
 
 
-def task_4(foursqr):
+def task_4(foursqr, cities):
     print('a) Unique users (distinct user_ids): ', unique_column_count(foursqr, 1))
     print('b) Total checkins (distinct checkin_ids): ', unique_column_count(foursqr, 0))
     print('c) Total sessions (distinct session_ids): ', unique_column_count(foursqr, 2))
-    print('d) How many countries (distinct country_codes): ', unique_column_count(cities_file, 3))
-    print('e) How many cities (distinct city names): ', unique_column_count(cities_file, 0))
+    t = time.time()
+    print('d) How many countries (distinct country_codes): ', unique_column_count(cities.map(lambda row: row[1]), 3))
+    print('----> time: ', time.time() - t)
+    t = time.time()
+    print('e) How many cities (distinct city names): ', unique_column_count(cities.map(lambda row: row[1]), 0))
+    print('----> time: ', time.time() - t)
+
 
 
 def task_5(foursqr):
@@ -120,11 +128,14 @@ def task_5(foursqr):
                         .countByKey()
     # sez = {y: x for x, y in session_lengths.items()}
     print('Task 5 time: ', time.time() - a)
+    '''
     print(session_lengths)
     plt.bar(session_lengths.keys(), list(map(log, session_lengths.values())))
     plt.xlabel('Session length')
     plt.ylabel('Sessions of given length (in log)')
     plt.show()
+    '''
+
 
 def task_6(foursqr):
     selection = foursqr.map(lambda row: (row[2],
@@ -162,6 +173,7 @@ def task_7(foursqr):
                                                         session_map['category'],
                                                         session_map['subcategory']))
 
+    '''
     with open("foursquare_task7_output.tsv", "w") as sessions_file:
         sessions_file.write("checkin_id\tuser_id\tsession_id\ttime\tlat\tlon\tcategory\tsubcategory\n")
         for session_id, session_store, length in selection:
@@ -175,7 +187,6 @@ def task_7(foursqr):
                                                                           session_map['category'],
                                                                           session_map['subcategory']))
 
-    '''
     Implemented a reduceByKey version that is 4x as fast, however - it is also wrong as haversine demands ordered positions.
 
 
@@ -235,12 +246,12 @@ def task_7(foursqr):
 
 
 import kdtree
-from rtree import Rtree
 
 def cartesian_to_latlong(x, y, z, r=6371.0):
     lat = asin(z / r)
     lon = atan2(y, x)
     return degrees(lat), degrees(lon)
+
 
 def cartesian_haversine(node, point):
     x, y, z = node
@@ -259,75 +270,43 @@ def latlong_to_cartesian(lat, lon, r=6371):
     z = r*cos(lat)
     return x, y, z
 
+
 def kdtree_query(tree, lat, lon):
     coords = latlong_to_cartesian(float(lat), float(lon))
     result = tuple(tree.search_nn(coords))[0].data
     return result
 
-def rtree_query(index, lat, lon):
-    return index.nearest(latlong_to_cartesian(lat, lon))
 
-
-
-def test(foursqr, cities):
-    # checkin_id[0], lat[1], lon[2]
-    user_coordination_data = foursqr.map(lambda x: (x[0], float(x[5]), float(x[6])))
-
-    # city[0], lat[1], lon[2], country[3]
-    city_coordination_data = cities.map(lambda x: (x[0], x[1], x[2], x[4]))
+def task_3(foursqr, cities):
     a = time.time()
-    cartesian_coords_cities_dict = dict(city_coordination_data
-                                        .map(lambda row: (tuple(latlong_to_cartesian(float(row[1]), float(row[2]))), (row[0], row[3])))
+    cartesian_coords_cities_dict = dict(cities
+                                        .map(lambda row: (
+                                        tuple(latlong_to_cartesian(row.lat, row.lon)),
+                                        row))
                                         .collect())
 
     tree = kdtree.create(cartesian_coords_cities_dict.keys())
-    cart_user_city_1 = user_coordination_data.map(lambda row:
-                                                  (
-                                                      cartesian_coords_cities_dict[
-                                                          kdtree_query(tree, float(row[1]), float(row[2]))
-                                                      ]
-                                                      , row
-                                                  )
-                                                  ).collect()
+    cart_user_city = foursqr.map(lambda row:
+                                   (
+                                       cartesian_coords_cities_dict[
+                                           kdtree_query(tree, row.lat, row.lon)
+                                       ]
+                                       , row
+                                   )
+                                   )
 
     print("KDTree: ", time.time() - a)
-
-    a = time.time()
-    r_tree = Rtree()
-    for key, value in cartesian_coords_cities_dict.items():
-        r_tree.add(key, value)
-
-
-    cart_user_city_2 = user_coordination_data.map(lambda row:
-                                                  (
-                                                      cartesian_coords_cities_dict[
-                                                          rtree_query(r_tree, float(row[1]), float(row[2]))
-                                                      ]
-                                                      , row
-                                                  )
-                                                  ).collect()
-    print("R-Tree: ", time.time() - a)
     '''
-    a = time.time()
-    cart_user_city_3 = user_coordination_data.cartesian(city_coordination_data)\
-          .map(lambda ((checkin_id, checkin_lat, checkin_lon), (city, lat, lon, country)):
-             (checkin_id, (city, country,
-              haversine(float(checkin_lat), float(checkin_lon), float(lat), float(lon)),
-              checkin_lat, checkin_lon)))\
-          .reduceByKey(lambda x1, x2: min(x1, x2, key=lambda x: x[1][2]))\
-          .collect()
 
-    print("reduceByKey: ", time.time() - a)
-    for session_map in cart_user_city_1:
-        print('KDTree', session_map)
-        #print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
-        #    session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
 
-    for session_map in cart_user_city_3:
-        print('reduceByKey', session_map)
-        #print("%s\t%s\t%s\t%s\t%s\t%s\n" % (
-        #    session_map[0], session_map[1][0], session_map[1][1], session_map[1][2], session_map[1][3], session_map[1][4]))
+    cities_df = cities_file.map(lambda c: Row(name=c[0], lat=float(c[1]), lon=float(c[2]), country_code=c[3],
+                                           country_name=c[4], type=c[5]))
+    checkin_df = foursqr.map(lambda l: Row(checkin_id=int(l[0]), user_id=int(l[1]), session_id=l[2],
+                                         time=timestamp(l[3], l[4]), lat=float(l[5]), lon=float(l[6]), category=l[7],
+                                         subcategory=l[8])
     '''
+
+    return cart_user_city
 
 if __name__ == "__main__":
     sc = SparkContext(appName="Foursquare")
@@ -375,13 +354,14 @@ if __name__ == "__main__":
     print('SQL context for checkins created')
 
     print('Task 1.3 - Assign a city and country to each check-in')
-    # cities = task_3(foursqr, cities_file)
+    # returns a dataframe
+    cities = task_3(checkin_df, cities_df)
 
     print('Task 1.4 - Bunch of questions')
-    # task_4(cities)
+    task_4(foursqr, cities)
 
     print('Task 1.5 - Calculate lengths of sessions as number of check-ins and provide a histogram')
-    task_5(foursqr)
+    # task_5(foursqr)
     # TODO: create histogram
 
     print('Task 1.6 - Calculate distance in km for sessions with 4 check-ins or more')
@@ -390,9 +370,6 @@ if __name__ == "__main__":
     print('Task 1.7 - Find 100 longest sessions')
     #task_7(foursqr)
     # https://imp.cartodb.com/viz/803ad096-ed4a-11e5-a173-0e5db1731f59/public_map
-
-
-    #test(foursqr, cities_file)
 
 
     sc.stop()
