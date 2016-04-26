@@ -73,13 +73,7 @@ if __name__ == "__main__":
         pos_path = "hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/positive-words.txt"
         neg_path = "hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/negative-words.txt"
     else:
-        print('twitter.py <inputfile> <outputfile> <positive_words> <negative_words>')
-
-        # For testing:
-        input_path = "tweets_excerpt.tsv"
-        output_path = "twitter_output.tsv"
-        pos_path = "hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/positive-words.txt"
-        neg_path = "hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/negative-words.txt"
+        sys.exit('twitter.py <inputfile> <outputfile> <positive_words> <negative_words>')
 
     # Loading files
     twitter_data = sc.textFile(input_path).map(lambda x: tuple(x.split('\t')))
