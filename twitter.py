@@ -5,11 +5,16 @@ import re, sys
 
 # - - - - - - - - - - - - - HELPER FUNCTIONS - - - - - - - - - - - - -
 
-def get_weekday(timestamp, offset):
-    weekdays = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday']
+def get_day_of_week(timestamp, offset):
+    weekdays = ['3', '4', '5', '6', '0', '1', '2']
     # Assuming offset is seconds, not minutes
     weekday = ((timestamp + offset) / 86400) % 7
     return weekdays[weekday]
+
+
+def get_weekday(day_of_week):
+    weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    return weekdays[int(day_of_week)]
 
 
 def tweet_char_filter(tweet):
@@ -69,6 +74,8 @@ if __name__ == "__main__":
         neg_path = "hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/negative-words.txt"
     else:
         print('twitter.py <inputfile> <outputfile> <positive_words> <negative_words>')
+
+        # For testing:
         input_path = "tweets_excerpt.tsv"
         output_path = "twitter_output.tsv"
         pos_path = "hdfs://dascosa09.idi.ntnu.no:8020/user/janryb/positive-words.txt"
@@ -93,7 +100,7 @@ if __name__ == "__main__":
 
     # Find the polarity of single tweets (-1, 0 or 1)
     tweets = tweets.map(lambda t: (
-        str(t[4]), str(get_weekday(t[0], t[1])),
+        str(t[4]), str(get_day_of_week(t[0], t[1])),
         get_tweet_polarity(str(t[6]), negative_words_data, positive_words_data)))
 
     # Create combined key with (city, weekday)
@@ -104,14 +111,15 @@ if __name__ == "__main__":
                                  lambda x, y: (x[0] + y[0], x[1] + y[1])).map(
         lambda (label, (value_sum, count)): (label, value_sum)).map(lambda t: (getCity(t[0]), getWeekday(t[0]), t[1]))
 
-    # TODO : sort by city, weekdays
+    # Sort by city -> weekday
+    tweets = tweets.sortBy(lambda x: (-1 * x[1], x[0]))
 
     print('Task 2.3 - Output result into file')
 
     with open(output_path, "w") as sessions_file:
         sessions_file.write("city\tweekday\toverall sentiment\n")
-        for session_map in tweets.collect():
-            sessions_file.write("%s\t%s\t%s\n" % (session_map[0], session_map[1], session_map[2]))
+        for tweet in tweets.collect():
+            sessions_file.write("%s\t%s\t%s\n" % (tweet[0], get_weekday(tweet[1]), tweet[2]))
 
     print('Output completed')
 
